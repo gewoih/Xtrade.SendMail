@@ -6,9 +6,8 @@ program Xtrade.SendMail;
 
 uses
   System.SysUtils,
-  uxService in 'uxService.pas',
-  uxLogWriter in 'uxLogWriter.pas',
-  uxServer in 'uxServer.pas';
+  uxServer in 'uxServer.pas',
+  uxService in '..\..\Components\Common\uxService.pas';
 
 begin
   ReportMemoryLeaksOnShutdown := True;

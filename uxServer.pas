@@ -11,7 +11,7 @@ uses
 	ActiveX,
 	Classes,
 	AnsiStrings, 
-	Registry,
+	IniFiles,
 	DateUtils,
 	Variants,
 	
@@ -27,7 +27,7 @@ uses
 var
 	Mail: TSMTPSend;
 	Mime: TMimemess;
-	reg: TRegistry;
+	Params: TIniFile;
 
 
 function SvcStart: boolean;
@@ -44,16 +44,14 @@ var fCon: OleVariant;
 
 function GetConStr: string;
 begin
-    reg.OpenKey('\SOFTWARE\Xtrade\XTrade.SendMail.exe\sql', false);
-    Result := 'Provider='+reg.ReadString('Prov') + ';'; //SQLNCLI11;';
+    Result := 'Provider='+params.ReadString('SQL', 'Prov', '') + ';'; //SQLNCLI11;';
     Result := Result + 'Persist Security Info=False;';
-    Result := Result + 'Data Source='+reg.ReadString('Serv') + ';';//192.168.44.100;';
-    Result := Result + 'Initial Catalog='+reg.ReadString('Base') + ';';//vtk;';
-    Result := Result + 'User ID='+reg.ReadString('User') + ';';//sa;';
+    Result := Result + 'Data Source='+params.ReadString('SQL', 'Serv', '') + ';';//192.168.44.100;';
+    Result := Result + 'Initial Catalog='+params.ReadString('SQL', 'Base', '') + ';';//vtk;';
+    Result := Result + 'User ID='+params.ReadString('SQL', 'User', '') + ';';//sa;';
     Result := Result + 'Application Name=' + ExtractFileName(ParamStr(0))+ ';';
     Result := Result + 'MultipleActiveResultSets=True;';
-    Result := Result + 'Password='+reg.ReadString('Pass') + ';';//icq99802122;'
-    reg.CloseKey;
+    Result := Result + 'Password='+params.ReadString('SQL', 'Pass', '') + ';';//icq99802122;'
 end;
 
 function ConnectSQL(Var Con:OleVariant): boolean;
@@ -87,34 +85,17 @@ function SvcStart: boolean;
 begin
 	CoInitializeEx(nil, 0);
 	Result := True;
-	reg := TRegistry.Create;
-	reg.RootKey:=HKEY_CURRENT_USER;
 	try
-		try
-			if not reg.OpenKey('\SOFTWARE\Xtrade\XTrade.SendMail.exe\smtp', true)
-            then raise Exception.Create('Key SMTP not found');
+        Mail := TSMTPSend.Create;
+        Mime := TMimeMess.Create;
+        Mail.TargetHost:=params.ReadString('MAILBOX', 'TargetHost', '');
+        Mail.UserName:=params.ReadString('MAILBOX', 'UserName', '');
+        Mail.Password:=params.ReadString('MAILBOX', 'Password', '');
+        Mail.AutoTLS:=False;
+        Mail.FullSSL:=False;
+        Mail.TargetPort:=params.ReadString('MAILBOX', 'Port', '');
 
-			Mail := TSMTPSend.Create;
-			Mime := TMimeMess.Create;
-			Debug('TargetHost', reg.ReadString('TargetHost'));
-			Debug('UserName', reg.ReadString('UserName'));
-			Debug('Password', reg.ReadString('Password'));
-			Mail.TargetHost:=reg.ReadString('TargetHost');
-			Mail.UserName:=reg.ReadString('UserName');
-			Mail.Password:=reg.ReadString('Password');
-			Mail.AutoTLS:=False;
-			Mail.FullSSL:=False;
-			Mail.TargetPort:='587';
-		finally
-			reg.CloseKey;
-		end;
-		try
-			if not reg.OpenKey('\SOFTWARE\Xtrade\XTrade.SendMail.exe', True) then raise Exception.Create('Key not found');
-			Debug('LoopDelay', reg.ReadInteger('LoopDelay'));
-			fLoopDelay:=reg.ReadInteger('LoopDelay');
-		finally
-			reg.CloseKey;
-		end;
+        fLoopDelay:=params.ReadInteger('Common', 'LoopDelay', 20000);
 	except
 		on E: exception do
 		begin
@@ -206,11 +187,14 @@ function SvcStop: boolean;
 begin
     Mail.Free;
     Mime.Free;
-    reg.free;
+    params.free;
     CoUninitialize;
 end;
 
 initialization
-  FormatSettings.DecimalSeparator := '.';
+  Params := TIniFile.Create(ChangeFileExt(ParamStr(0), '.ini'));
+	FormatSettings.DecimalSeparator := '.';
+finalization
+  Params.Free;
 end.
 
